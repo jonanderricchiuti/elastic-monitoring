@@ -1,0 +1,158 @@
+version: "3.9"
+
+services:
+  enode1:
+    #image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    build:
+      context: ./
+      dockerfile: elastic.Dockerfile
+      args:
+        STACK_VERSION: ${STACK_VERSION}
+        NODE_NAME: enode1
+    volumes:
+      - enodedata1:/usr/share/elasticsearch/data
+    ports:
+      - ${ES_PORT}:9200
+    environment:
+      - node.name=enode1
+      - node.roles=master,data,ingest,remote_cluster_client
+      - cluster.name=${CLUSTER_NAME}
+      - cluster.initial_master_nodes=enode1,enode2,enode3
+      - discovery.seed_hosts=enode2,enode3
+      - bootstrap.memory_lock=false
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/enode1/enode1.key
+      - xpack.security.http.ssl.certificate=certs/enode1/enode1.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/enode1/enode1.key
+      - xpack.security.transport.ssl.certificate=certs/enode1/enode1.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.license.self_generated.type=${LICENSE}
+    mem_limit: ${MEM_LIMIT}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  enode2:
+    #image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    build:
+      context: ./
+      dockerfile: elastic.Dockerfile
+      args:
+        STACK_VERSION: ${STACK_VERSION}
+        NODE_NAME: enode2
+    volumes:
+      - enodedata2:/usr/share/elasticsearch/data
+    environment:
+      - node.name=enode2
+      - node.roles=master,data,ingest
+      - cluster.name=${CLUSTER_NAME}
+      - cluster.initial_master_nodes=enode1,enode2,enode3
+      - discovery.seed_hosts=enode1,enode3
+      - bootstrap.memory_lock=false
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/enode2/enode2.key
+      - xpack.security.http.ssl.certificate=certs/enode2/enode2.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/enode2/enode2.key
+      - xpack.security.transport.ssl.certificate=certs/enode2/enode2.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.license.self_generated.type=${LICENSE}
+    mem_limit: ${MEM_LIMIT}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  enode3:
+    #image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    build:
+      context: ./
+      dockerfile: elastic.Dockerfile
+      args:
+        STACK_VERSION: ${STACK_VERSION}
+        NODE_NAME: enode3
+    volumes:
+      - enodedata3:/usr/share/elasticsearch/data
+    environment:
+      - node.name=enode3
+      - node.roles=master,data,ingest
+      - cluster.name=${CLUSTER_NAME}
+      - cluster.initial_master_nodes=enode1,enode2,enode3
+      - discovery.seed_hosts=enode1,enode2
+      - bootstrap.memory_lock=false
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/enode3/enode3.key
+      - xpack.security.http.ssl.certificate=certs/enode3/enode3.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/enode3/enode3.key
+      - xpack.security.transport.ssl.certificate=certs/enode3/enode3.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.license.self_generated.type=${LICENSE}
+    mem_limit: ${MEM_LIMIT}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  kibana:
+    #image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    build:
+      context: ./
+      dockerfile: kibana.Dockerfile
+      args:
+        STACK_VERSION: ${STACK_VERSION}
+    volumes:
+      - kibanadata:/usr/share/kibana/data
+    ports:
+      - ${KIBANA_PORT}:5601
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=https://enode1:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD_FILE=/run/secrets/kibana_password
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+    secrets:
+      - kibana_password
+    mem_limit: ${MEM_LIMIT}
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:${STACK_VERSION}
+    user: root
+    environment:
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=/config/certs/ca/ca.crt
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./certs/ca/ca.crt:/config/certs/ca/ca.crt
+      - /var/lib/docker:/var/lib/docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+
+secrets:
+  kibana_password:
+    file: kibana.pwd
+
+
+volumes:
+  enodedata1:
+    driver: local
+  enodedata2:
+    driver: local
+  enodedata3:
+    driver: local
+  kibanadata:
+    driver: local
+
+
